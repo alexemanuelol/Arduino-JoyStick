@@ -13,6 +13,14 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**************************
+ *  Defines
+ *************************/
+
+#define SENSOR_MIN_VALUE    0
+#define SENSOR_MAX_VALUE    1024
+#define MOUSE_STEP_OFFSET   100
+
 
 /**************************
  *  Includes
@@ -30,8 +38,10 @@ int switchPin = 9;                      /* Switch pin for the joystick. */
 int horizontalMidPos;                   /* The middle or natural position of the joystick horizontally. */
 int verticalMidPos;                     /* The middle or natural position of the joystick vertically. */
 
-int horizontalValue;                    /* Stores the current horizontal value. */
-int verticalValue;                      /* Stores the current vertical value. */
+int hStep;                              /* Stores the current horizontal step value. */
+int vStep;                              /* Stores the current vertical step value. */
+String hStepSign;                       /* Stores the current step value sign. */
+String vStepSign;                       /* Stores the current step value sign. */
 
 
 /**********************************************************************************************************************
@@ -49,7 +59,7 @@ void setup()
     digitalWrite(switchPin, HIGH);      /* Pull switch pin high. */
     delay(500);                         /* Short delay to let outputs settle */
 
-    /* Initial joystick values (Hoystick should be in neutral position when reading these). */
+    /* Initial joystick values (Joystick should be in neutral position when reading these). */
     horizontalMidPos = analogRead(horizontalPin);
     verticalMidPos = analogRead(verticalPin);
 }
@@ -60,12 +70,50 @@ void setup()
  *********************************************************************************************************************/
 void loop()
 {
-    /* Get joystick values. */
-    horizontalValue = analogRead(horizontalPin);    /* Read the horizontal joystick value. */
-    verticalValue = analogRead(verticalPin);        /* Read the vertical joystick value. */
+    /* Get mouse step values. */
+    hStep = translate_to_steps(analogRead(horizontalPin), horizontalMidPos);
+    vStep = translate_to_steps(analogRead(verticalPin), verticalMidPos);
 
-    Serial.print("x: ");
-    Serial.print(horizontalValue);
-    Serial.print("  y: ");
-    Serial.println(verticalValue);
+    /* Set the step signs. */
+    hStepSign = (hStep < 0) ? "" : "+";
+    vStepSign = (vStep < 0) ? "" : "+";
+
+    /* 'S' indicate start, ':' seperate the step values, 'E' indicate end. */
+    String str = "S" + hStepSign + ((String) hStep) + ":" + vStepSign + ((String) vStep) + "E";
+
+    /* Send mouse steps via serial interface. */
+    Serial.print(str);
+}
+
+
+/**********************************************************************************************************************
+ *  Translates joystick sensor values to mouse steps
+ *********************************************************************************************************************/
+int translate_to_steps(int value, int midPos)
+{
+    int steps = 0;
+    int lowerEdge = midPos - MOUSE_STEP_OFFSET;
+    int higherEdge = midPos + MOUSE_STEP_OFFSET;
+
+    /* If not inside joystick sensor value range */
+    if (value < SENSOR_MIN_VALUE || value > SENSOR_MAX_VALUE)
+    {
+        return 0;
+    }
+
+    for (steps = 0; steps <= (midPos / MOUSE_STEP_OFFSET); steps++)
+    {
+        if (value >= lowerEdge && value <= midPos)
+        {
+            return (-1 * steps);
+        }
+        else if (value <= higherEdge && value >= midPos)
+        {
+            return steps;
+        }
+        lowerEdge -= MOUSE_STEP_OFFSET;
+        higherEdge += MOUSE_STEP_OFFSET;
+    }
+
+    return 0;
 }
