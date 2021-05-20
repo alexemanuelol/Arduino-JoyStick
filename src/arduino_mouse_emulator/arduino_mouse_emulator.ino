@@ -24,8 +24,9 @@
 #define SENSOR_READING_TIMEOUT_MS   10
 #define KEEP_ALIVE_TIMEOUT_MS       10000
 
-#define START_MESSAGE               "0x1"
-#define KEEP_ALIVE_MESSAGE          "0x2"
+#define HELLO_MESSAGE               '0'
+#define START_MESSAGE               '1'
+#define KEEP_ALIVE_MESSAGE          '2'
 
 
 /**************************
@@ -51,7 +52,7 @@ int vStep;                  /* Stores the current vertical step value. */
 String hStepSign;           /* Stores the current horizontal step value sign. */
 String vStepSign;           /* Stores the current vertical step value sign. */
 
-String keepAliveReceived;
+char keepAliveReceived;
 uint16_t keepAliveCounter = 0;
 
 
@@ -105,15 +106,20 @@ void loop()
  *********************************************************************************************************************/
 void wait_for_start()
 {
-    String received;
+    char received;
 
     while (true)
     {
         if (Serial.available())
         {
-            received = Serial.readString();
+            received = Serial.read();
 
-            if (find_substring(received, (String) START_MESSAGE))
+            if (received == HELLO_MESSAGE)
+            {
+                Serial.print("OK");
+                continue;
+            }
+            else if (received == START_MESSAGE)
             {
                 /* Start message received, let's start sensor reading and transmittion! */
                 break;
@@ -137,9 +143,9 @@ bool check_keep_alive()
 
     if (Serial.available())
     {
-        keepAliveReceived = Serial.readString();
+        keepAliveReceived = Serial.read();
 
-        if (find_substring(keepAliveReceived, (String) KEEP_ALIVE_MESSAGE))
+        if (keepAliveReceived == KEEP_ALIVE_MESSAGE)
         {
             keepAliveCounter = 0;
             return true;
