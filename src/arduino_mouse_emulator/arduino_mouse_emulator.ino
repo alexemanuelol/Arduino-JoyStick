@@ -20,41 +20,42 @@
 #define JOYSTICK_HORIZONTAL_PIN     A7          /* Analog input pin for horizontal joystick value. */
 #define JOYSTICK_VERTICAL_PIN       A6          /* Analog input pin for vertical joystick value. */
 #define JOYSTICK_SWITCH_PIN         9           /* Joystick switch pin. */
+#define LEFT_CLICK_SWITCH_PIN       8           /* Left click switch pin. */
+#define RIGHT_CLICK_SWITCH_PIN      7           /* Right click switch pin. */
 #define LED_GREEN_PIN               6           /* Green LED pin. */
 #define LED_RED_PIN                 5           /* Red LED pin. */
 
-#define SENSOR_MIN_VALUE            0
-#define SENSOR_MAX_VALUE            1024
-#define MOUSE_STEP_OFFSET           100
+#define SENSOR_MIN_VALUE            0           /* The minimum value of the joystick sensor. */
+#define SENSOR_MAX_VALUE            1024        /* The maximum value of the joystick sensor. */
+#define STEP_OFFSET                 20          /* Based on joystick sensor value interval, how much for one step? */
 
-#define SENSOR_READING_TIMEOUT_MS   10
-#define KEEP_ALIVE_TIMEOUT_MS       10000
+#define HEARTBEAT_TIMEOUT_MS        10          /* The heartbeat timeout of the arduino. */
+#define KEEP_ALIVE_TIMEOUT_MS       10000       /* Timeout before looking for the start event again. */
 
-#define HELLO_MESSAGE               '0'
-#define START_MESSAGE               '1'
-#define KEEP_ALIVE_MESSAGE          '2'
-
-
-/**************************
- *  Includes
- *************************/
+#define HELLO_EVENT                 '0'
+#define START_EVENT                 '1'
+#define KEEP_ALIVE_EVENT            '2'
 
 
 /**************************
  *  Global variables
  *************************/
 
-int hMidPosValue;           /* The middle or neutral position value of the joystick horizontally. */
-int vMidPosValue;           /* The middle or neutral position value of the joystick vertically. */
-int hValue;                 /* The joystick horizontal value. */
-int vValue;                 /* The joystick vertical value. */
+int joystickHorizontalNeutralPosValue;          /* The neutral position value of the joystick horizontally. */
+int joystickVerticalNeutralPosValue;            /* The neutral position value of the joystick vertically. */
+int joystickHorizontalValue;                    /* The joystick horizontal value. */
+int joystickVerticalValue;                      /* The joystick vertical value. */
 
-int hStep;                  /* Stores the current horizontal step value. */
-int vStep;                  /* Stores the current vertical step value. */
-String hStepSign;           /* Stores the current horizontal step value sign. */
-String vStepSign;           /* Stores the current vertical step value sign. */
+int horizontalPixelSteps;                       /* Stores the current horizontal pixel steps value. */
+int verticalPixelSteps;                         /* Stores the current vertical pixel steps value. */
+String horizontalPixelStepsSign;                /* Stores the current horizontal pixel steps value sign (+/-). */
+String verticalPixelStepsSign;                  /* Stores the current vertical pixel steps value sign (+/-). */
 
-char keepAliveReceived;
+int joystickSwitchState;                        /* The state of the joystick switch. */
+int leftClickSwitchState;                       /* The state of the left click switch. */
+int rightClickSwitchState;                      /* The state of the right click switch. */
+
+char receivedSerial;
 uint16_t keepAliveCounter = 0;
 
 
@@ -63,24 +64,28 @@ uint16_t keepAliveCounter = 0;
  *********************************************************************************************************************/
 void setup()
 {
-    Serial.begin(9600);                 /* Start serial monitor. */
+    /* Start serial communication. */
+    Serial.begin(9600);
 
-    /* Set analog pins as inputs (reads from the joystick sensor). */
-    pinMode(JOYSTICK_HORIZONTAL_PIN, INPUT);
-    pinMode(JOYSTICK_VERTICAL_PIN, INPUT);
+    /* Joystick sensors. */
+    pinMode(JOYSTICK_HORIZONTAL_PIN, INPUT);        /* Analog input for horizontal sensor. */
+    pinMode(JOYSTICK_VERTICAL_PIN, INPUT);          /* Analog input for vertical sensor. */
+
+    /* Switches. */
+    pinMode(JOYSTICK_SWITCH_PIN, INPUT_PULLUP);     /* Simulates scroll wheel. */
+    pinMode(LEFT_CLICK_SWITCH_PIN, INPUT_PULLUP);   /* Simulates left click. */
+    pinMode(RIGHT_CLICK_SWITCH_PIN, INPUT_PULLUP);  /* Simulates right click. */
 
     /* LEDs */
-    pinMode(LED_GREEN_PIN, OUTPUT);
-    pinMode(LED_RED_PIN, OUTPUT);
+    pinMode(LED_GREEN_PIN, OUTPUT);                 /* The green LED. */
+    pinMode(LED_RED_PIN, OUTPUT);                   /* The red LED. */
 
-    pinMode(JOYSTICK_SWITCH_PIN, INPUT);              /* Set the switch pin as input. */
-    digitalWrite(JOYSTICK_SWITCH_PIN, HIGH);          /* Pull switch pin high. */
-
-    delay(500);                         /* Short delay to let outputs settle */
+    /* Short delay to let outputs settle. */
+    delay(100);
 
     /* Initial joystick values (Joystick should be in neutral position when reading these). */
-    hMidPosValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
-    vMidPosValue = analogRead(JOYSTICK_VERTICAL_PIN);
+    joystickHorizontalNeutralPosValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
+    joystickVerticalNeutralPosValue = analogRead(JOYSTICK_VERTICAL_PIN);
 }
 
 
@@ -89,8 +94,8 @@ void setup()
  *********************************************************************************************************************/
 void loop()
 {
-    /* Wait for a start message from the script. */
-    wait_for_start();
+    /* Wait for the start event via serial communication. */
+    wait_for_start_event();
 
     while (true)
     {
@@ -99,147 +104,166 @@ void loop()
             break;
         }
 
-        read_joystick_sensor();
-        calculate_steps();
-        set_step_signs();
-        tx_data_package();
-        delay(SENSOR_READING_TIMEOUT_MS);
+        read_joystick_sensors();
+        read_switches();
+        convert_to_pixel_steps();
+        set_pixel_steps_signs();
+        transmit_data_package_frame();
+
+        delay(HEARTBEAT_TIMEOUT_MS);
     }
 }
 
 
 /**********************************************************************************************************************
- *  Wait for a start message from the script.
+ *  Wait for the start event via serial communication.
  *********************************************************************************************************************/
-void wait_for_start()
+void wait_for_start_event()
 {
-    char received;
-
-    set_joystick_active_leds(false);
+    set_leds_active_state(false);       /* Green LED on. */
 
     while (true)
     {
         if (Serial.available())
         {
-            received = Serial.read();
+            receivedSerial = Serial.read();
 
-            if (received == HELLO_MESSAGE)
+            if (receivedSerial == HELLO_EVENT)
             {
-                Serial.print("OK");
+                Serial.print("HELLO");
                 continue;
             }
-            else if (received == START_MESSAGE)
+            else if (receivedSerial == START_EVENT)
             {
-                /* Start message received, let's start sensor reading and transmittion! */
+                /* Start message received, let's start sensor reading and transmission! */
                 break;
             }
         }
     }
 
-    set_joystick_active_leds(true);
+    set_leds_active_state(true);        /* Red LED on. */
 }
 
 
 /**********************************************************************************************************************
  *  Alternate the green and red LEDs. True turns on green and turns off red, false turns off green and turns on red.
  *********************************************************************************************************************/
-void set_joystick_active_leds(bool active)
+void set_leds_active_state(bool active)
 {
-    if (active)
-    {
-        digitalWrite(LED_GREEN_PIN, HIGH);
-        digitalWrite(LED_RED_PIN, LOW);
-    }
-    else
-    {
-        digitalWrite(LED_GREEN_PIN, LOW);
-        digitalWrite(LED_RED_PIN, HIGH);
-    }
+    digitalWrite(LED_GREEN_PIN, active);
+    digitalWrite(LED_RED_PIN, !active);
 }
 
 
 /**********************************************************************************************************************
- *  A continuous check to see if a connection is still present between arduino and script.
+ *  A continuous check to see if a connection is still present via serial communication.
  *********************************************************************************************************************/
 bool check_keep_alive()
 {
     if (keepAliveCounter >= KEEP_ALIVE_TIMEOUT_MS)
     {
+        /* No keep alive message have been received within the timeframe, go back to 'wait_for_start_event'. */
         keepAliveCounter = 0;
-        /* No keep alive message have been received within the timeframe, go back to 'wait_for_start'. */
         return false;
     }
 
     if (Serial.available())
     {
-        keepAliveReceived = Serial.read();
+        receivedSerial = Serial.read();
 
-        if (keepAliveReceived == KEEP_ALIVE_MESSAGE)
+        if (receivedSerial == KEEP_ALIVE_EVENT)
         {
             keepAliveCounter = 0;
             return true;
         }
     }
 
-    keepAliveCounter += SENSOR_READING_TIMEOUT_MS;
+    keepAliveCounter += HEARTBEAT_TIMEOUT_MS;
 
     return true;
 }
 
 
 /**********************************************************************************************************************
- *  Reads the joystick sensor (horizontal and vertical data).
+ *  Reads the joystick sensors (horizontal and vertical data).
  *********************************************************************************************************************/
-void read_joystick_sensor()
+void read_joystick_sensors()
 {
-    hValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
-    vValue = analogRead(JOYSTICK_VERTICAL_PIN);
+    joystickHorizontalValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
+    joystickVerticalValue = analogRead(JOYSTICK_VERTICAL_PIN);
 }
 
 
 /**********************************************************************************************************************
- *  Calculates the steps based on the joystick sensor values.
+ *  Reads the switches.
  *********************************************************************************************************************/
-void calculate_steps()
+void read_switches()
+{
+    joystickSwitchState = (digitalRead(JOYSTICK_SWITCH_PIN) == 1) ? 0 : 1;
+    leftClickSwitchState = digitalRead(LEFT_CLICK_SWITCH_PIN);
+    rightClickSwitchState = digitalRead(RIGHT_CLICK_SWITCH_PIN);
+}
+
+
+/**********************************************************************************************************************
+ *  Converts the joystick sensor values to pixel steps.
+ *********************************************************************************************************************/
+void convert_to_pixel_steps()
 {
     /* Get mouse step values. */
-    hStep = translate_to_steps(hValue, hMidPosValue);
-    vStep = translate_to_steps(vValue, vMidPosValue);
+    horizontalPixelSteps = translate_value_to_pixel_steps(joystickHorizontalValue, joystickHorizontalNeutralPosValue);
+    verticalPixelSteps = translate_value_to_pixel_steps(joystickVerticalValue, joystickVerticalNeutralPosValue);
 }
 
 
 /**********************************************************************************************************************
- *  Sets the steps signs (+ or -).
+ *  Sets the pixel steps signs (+ or -).
  *********************************************************************************************************************/
-void set_step_signs()
+void set_pixel_steps_signs()
 {
     /* Set the step signs. */
-    hStepSign = (hStep < 0) ? "" : "+";
-    vStepSign = (vStep < 0) ? "" : "+";
+    horizontalPixelStepsSign = (horizontalPixelSteps < 0) ? "" : "+";
+    verticalPixelStepsSign = (verticalPixelSteps < 0) ? "" : "+";
 }
 
 
 /**********************************************************************************************************************
- *  Transmits the steps data package via serial.
+ *  Transmits the steps data and switch states package via serial.
  *********************************************************************************************************************/
-void tx_data_package()
+void transmit_data_package_frame()
 {
-    /* 'S' indicate start, ':' seperate the step values, 'E' indicate end. */
-    String str = "S" + hStepSign + ((String) hStep) + ":" + vStepSign + ((String) vStep) + "E";
+    /* 'S' indicate start, ':' seperate the values, 'E' indicate end. */
+    /* Order of values:
+        Horizontal pixel steps
+        Veritcal pixel steps
+        joystick switch state (1 = pressed)
+        left click switch state (1 = pressed)
+        right click switch state (1 = pressed) */
+    String frame = "S" +
+                   horizontalPixelStepsSign + ((String) horizontalPixelSteps) +
+                   ":" +
+                   verticalPixelStepsSign + ((String) verticalPixelSteps) +
+                   ":" +
+                   joystickSwitchState +
+                   ":" +
+                   leftClickSwitchState +
+                   ":" +
+                   rightClickSwitchState +
+                   "E";
 
-    /* Send mouse steps via serial interface. */
-    Serial.print(str);
+    /* Send package frame via serial interface. */
+    Serial.print(frame);
 }
 
 
 /**********************************************************************************************************************
- *  Translates joystick sensor values to mouse steps
+ *  Translates joystick sensor value to pixel steps.
  *********************************************************************************************************************/
-int translate_to_steps(int value, int midPos)
+int translate_value_to_pixel_steps(int value, int midPos)
 {
     int steps = 0;
-    int lowerEdge = midPos - MOUSE_STEP_OFFSET;
-    int higherEdge = midPos + MOUSE_STEP_OFFSET;
+    int lowerEdge = midPos - STEP_OFFSET;
+    int higherEdge = midPos + STEP_OFFSET;
 
     /* If not inside joystick sensor value range */
     if (value < SENSOR_MIN_VALUE || value > SENSOR_MAX_VALUE)
@@ -247,7 +271,7 @@ int translate_to_steps(int value, int midPos)
         return 0;
     }
 
-    for (steps = 0; steps <= (midPos / MOUSE_STEP_OFFSET); steps++)
+    for (steps = 0; steps <= (midPos / STEP_OFFSET); steps++)
     {
         if (value >= lowerEdge && value <= midPos)
         {
@@ -257,50 +281,9 @@ int translate_to_steps(int value, int midPos)
         {
             return steps;
         }
-        lowerEdge -= MOUSE_STEP_OFFSET;
-        higherEdge += MOUSE_STEP_OFFSET;
+        lowerEdge -= STEP_OFFSET;
+        higherEdge += STEP_OFFSET;
     }
 
     return 0;
-}
-
-
-/**********************************************************************************************************************
- *  Find a substring withing a string.
- *********************************************************************************************************************/
-bool find_substring(String str, String substr)
-{
-    int strLength = str.length();
-    int substrLength = substr.length();
-
-    if (substrLength > strLength)
-    {
-        return false;
-    }
-
-    int i, j;
-    for (i = 0, j = 0; i != strLength; i++)
-    {
-        if (str[i] == substr[j])
-        {
-            if ((j + 1) == substrLength)
-            {
-                return true;
-            }
-            j++;
-        }
-        else
-        {
-            j = 0;
-        }
-    }
-
-    if ((j + 1) == substrLength)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
 }
