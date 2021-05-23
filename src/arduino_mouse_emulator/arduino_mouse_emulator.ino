@@ -19,7 +19,9 @@
 
 #define JOYSTICK_HORIZONTAL_PIN     A7          /* Analog input pin for horizontal joystick value. */
 #define JOYSTICK_VERTICAL_PIN       A6          /* Analog input pin for vertical joystick value. */
-#define JOYSTICK_SWITCH_PIN         9           /* Joystick switch pin */
+#define JOYSTICK_SWITCH_PIN         9           /* Joystick switch pin. */
+#define LED_GREEN_PIN               6           /* Green LED pin. */
+#define LED_RED_PIN                 5           /* Red LED pin. */
 
 #define SENSOR_MIN_VALUE            0
 #define SENSOR_MAX_VALUE            1024
@@ -67,8 +69,13 @@ void setup()
     pinMode(JOYSTICK_HORIZONTAL_PIN, INPUT);
     pinMode(JOYSTICK_VERTICAL_PIN, INPUT);
 
+    /* LEDs */
+    pinMode(LED_GREEN_PIN, OUTPUT);
+    pinMode(LED_RED_PIN, OUTPUT);
+
     pinMode(JOYSTICK_SWITCH_PIN, INPUT);              /* Set the switch pin as input. */
     digitalWrite(JOYSTICK_SWITCH_PIN, HIGH);          /* Pull switch pin high. */
+
     delay(500);                         /* Short delay to let outputs settle */
 
     /* Initial joystick values (Joystick should be in neutral position when reading these). */
@@ -108,6 +115,8 @@ void wait_for_start()
 {
     char received;
 
+    set_joystick_active_leds(false);
+
     while (true)
     {
         if (Serial.available())
@@ -125,6 +134,26 @@ void wait_for_start()
                 break;
             }
         }
+    }
+
+    set_joystick_active_leds(true);
+}
+
+
+/**********************************************************************************************************************
+ *  Alternate the green and red LEDs. True turns on green and turns off red, false turns off green and turns on red.
+ *********************************************************************************************************************/
+void set_joystick_active_leds(bool active)
+{
+    if (active)
+    {
+        digitalWrite(LED_GREEN_PIN, HIGH);
+        digitalWrite(LED_RED_PIN, LOW);
+    }
+    else
+    {
+        digitalWrite(LED_GREEN_PIN, LOW);
+        digitalWrite(LED_RED_PIN, HIGH);
     }
 }
 
