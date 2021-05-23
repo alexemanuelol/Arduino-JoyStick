@@ -17,6 +17,10 @@
  *  Defines
  *************************/
 
+#define JOYSTICK_HORIZONTAL_PIN     A7          /* Analog input pin for horizontal joystick value. */
+#define JOYSTICK_VERTICAL_PIN       A6          /* Analog input pin for vertical joystick value. */
+#define JOYSTICK_SWITCH_PIN         9           /* Joystick switch pin */
+
 #define SENSOR_MIN_VALUE            0
 #define SENSOR_MAX_VALUE            1024
 #define MOUSE_STEP_OFFSET           100
@@ -37,10 +41,6 @@
 /**************************
  *  Global variables
  *************************/
-
-int hPin = A7;              /* Analog input pin for horizontal joystick value. */
-int vPin = A6;              /* Analog input pin for vertical joystick value. */
-int swPin = 9;              /* Switch pin for the joystick. */
 
 int hMidPosValue;           /* The middle or neutral position value of the joystick horizontally. */
 int vMidPosValue;           /* The middle or neutral position value of the joystick vertically. */
@@ -64,16 +64,16 @@ void setup()
     Serial.begin(9600);                 /* Start serial monitor. */
 
     /* Set analog pins as inputs (reads from the joystick sensor). */
-    pinMode(hPin, INPUT);
-    pinMode(vPin, INPUT);
+    pinMode(JOYSTICK_HORIZONTAL_PIN, INPUT);
+    pinMode(JOYSTICK_VERTICAL_PIN, INPUT);
 
-    pinMode(swPin, INPUT);              /* Set the switch pin as input. */
-    digitalWrite(swPin, HIGH);          /* Pull switch pin high. */
+    pinMode(JOYSTICK_SWITCH_PIN, INPUT);              /* Set the switch pin as input. */
+    digitalWrite(JOYSTICK_SWITCH_PIN, HIGH);          /* Pull switch pin high. */
     delay(500);                         /* Short delay to let outputs settle */
 
     /* Initial joystick values (Joystick should be in neutral position when reading these). */
-    hMidPosValue = analogRead(hPin);
-    vMidPosValue = analogRead(vPin);
+    hMidPosValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
+    vMidPosValue = analogRead(JOYSTICK_VERTICAL_PIN);
 }
 
 
@@ -163,8 +163,8 @@ bool check_keep_alive()
  *********************************************************************************************************************/
 void read_joystick_sensor()
 {
-    hValue = analogRead(hPin);
-    vValue = analogRead(vPin);
+    hValue = analogRead(JOYSTICK_HORIZONTAL_PIN);
+    vValue = analogRead(JOYSTICK_VERTICAL_PIN);
 }
 
 
