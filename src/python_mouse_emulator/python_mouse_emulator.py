@@ -55,7 +55,9 @@ class MouseEmulator:
                     break
 
             if self.__sp.port != None:
-                self.connect_to_joystick()
+                if not self.__sp.isOpen():
+                    self.__sp.open()
+                self.connected = True
                 self.main_thread()
             else:
                 continue
@@ -91,7 +93,11 @@ class MouseEmulator:
     def test_port(self, port):
         """ Test the port to see if it is the joystick. """
         try:# {{{
+            self.__sp.close()
             self.__sp.port = port
+            self.__sp.open()
+            self.__sp.flush()
+
             time.sleep(.5)
 
             received = ""
@@ -100,29 +106,25 @@ class MouseEmulator:
                 time.sleep(.2)
                 received += self.__sp.read(self.__sp.in_waiting).decode()
 
-            if ("HELLO" in received):
+            if "HELLO" in received:
                 print(f"Arduino joystick found on port: {port}")
                 return True
             else:
-                self.__sp.close()
+                self.clear_port()
                 return False
 
-        except (OSError, serial.SerialException):
-            self.__sp.close()
+        except (OSError, serial.SerialException) as e:
+            self.clear_port()
             return False
         except (UnicodeDecodeError):
-            self.__sp.close()
+            self.clear_port()
             return False# }}}
 
 
-    def connect_to_joystick(self):
-        """ Opens the serial connection to the joystick. """
-        try:# {{{
-            if not self.__sp.isOpen():
-                self.__sp.open()
-        except:
-            raise Exception("Could not open port.")
-        self.connected = True# }}}
+    def clear_port(self):
+        """ closes connection and set port to None. """
+        self.__sp.close()
+        self.__sp.port = None
 
 
     def main_thread(self):
