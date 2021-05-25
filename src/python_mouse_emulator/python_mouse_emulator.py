@@ -17,6 +17,7 @@ class MouseEmulator:
         self.connected = False
         self.baudrate = 9600
         self.regex = r"S[+-][0-9]+:[+-][0-9]+:\d:\d:\dE"
+        self.communicationTimeout = 10000
 
         # button states
         self.prevJoystickButtonState =  0
@@ -155,12 +156,14 @@ class MouseEmulator:
         """ Serial communication reading thread. """
         buffer = ""# {{{
         data = ""
+        timeoutTimer = time.time()
 
         try:
             while self.connected:
                 data = self.__sp.read(self.__sp.in_waiting).decode()
 
                 if data != "":
+                    timeoutTimer = time.time()
                     # Append to the buffer variable
                     buffer += data
 
@@ -174,10 +177,15 @@ class MouseEmulator:
                         joystickActions = self.get_values_from_frames(frames)
                         self.execute_joystick_actions(joystickActions)
 
+                if ((time.time() - timeoutTimer) * 1000) >= self.communicationTimeout:
+                    self.connected = False
+
         except (OSError, serial.serialutil.SerialException) as e:
             print("Problem with the serial connection...")
+            self.connected = False
         except (UnicodeDecodeError) as e:
             print("Problem with decoding the byte...")# }}}
+            self.connected = False
 
 
     def get_values_from_frames(self, frames):
