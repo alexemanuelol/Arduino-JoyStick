@@ -16,13 +16,11 @@ class MouseEmulator:
         # General variables
         self.connected = False
         self.baudrate = 9600
-        self.regex = r"S[+-][0-9]+:[+-][0-9]+:\d:\d:\dE"
+        self.regex = r"S[+-][0-9]+:[+-][0-9]+:\dE"
         self.communicationTimeout = 10000
 
         # button states
         self.prevJoystickButtonState =  0
-        self.prevLeftButtonState = 0
-        self.prevRightButtonState = 0
 
         # pyautogui init
         pyautogui.PAUSE = 0
@@ -124,8 +122,8 @@ class MouseEmulator:
 
     def clear_port(self):
         """ closes connection and set port to None. """
-        self.__sp.close()
-        self.__sp.port = None
+        self.__sp.close()# {{{
+        self.__sp.port = None# }}}
 
 
     def main_thread(self):
@@ -184,8 +182,8 @@ class MouseEmulator:
             print("Problem with the serial connection...")
             self.connected = False
         except (UnicodeDecodeError) as e:
-            print("Problem with decoding the byte...")# }}}
-            self.connected = False
+            print("Problem with decoding the byte...")
+            self.connected = False# }}}
 
 
     def get_values_from_frames(self, frames):
@@ -206,15 +204,13 @@ class MouseEmulator:
 
         frame = (frame[1:][:-1]).split(":")
 
-        if len(frame) != 5:
+        if len(frame) != 3:
             raise Exception("the frame was invalid.")
 
         frameValues = dict()
         frameValues["joyX"] = int(frame[0])
         frameValues["joyY"] = int(frame[1])
         frameValues["joySw"] = int(frame[2])
-        frameValues["leftSw"] = int(frame[3])
-        frameValues["rightSw"] = int(frame[4])
         return frameValues# }}}
 
 
@@ -222,7 +218,7 @@ class MouseEmulator:
         """ Executes joystick actions defined in the joystickActions list. """
         for actions in joystickActions:# {{{
             self.execute_joystick_movements(actions["joyX"], actions["joyY"])
-            self.execute_joystick_button_actions(actions["joySw"], actions["leftSw"], actions["rightSw"])# }}}
+            self.execute_joystick_button_actions(actions["joySw"])# }}}
 
 
     def execute_joystick_movements(self, x, y):
@@ -230,33 +226,17 @@ class MouseEmulator:
         pyautogui.move(x, y)# {{{}}}
 
 
-    def execute_joystick_button_actions(self, joystickButtonState, leftButtonState, rightButtonState):
+    def execute_joystick_button_actions(self, joystickButtonState):
         """ Executes the actions from the button states. """
-        # Joystick button
+        # Joystick button{{{
         if joystickButtonState != self.prevJoystickButtonState:
             if joystickButtonState == 1:
                 pyautogui.mouseDown(button="left")
             else:
                 pyautogui.mouseUp(button="left")
 
-        # Left 'mouse' button
-        if leftButtonState != self.prevLeftButtonState:
-            if leftButtonState == 1:
-                pyautogui.mouseDown(button="left")
-            else:
-                pyautogui.mouseUp(button="left")
-
-        # Right 'mouse' button
-        if rightButtonState != self.prevRightButtonState:
-            if rightButtonState == 1:
-                pyautogui.mouseDown(button="right")
-            else:
-                pyautogui.mouseUp(button="right")
-
         # Set the previous state
-        self.prevJoystickButtonState = joystickButtonState
-        self.prevLeftButtonState = leftButtonState
-        self.prevRightButtonState = rightButtonState
+        self.prevJoystickButtonState = joystickButtonState# }}}
 
 
 

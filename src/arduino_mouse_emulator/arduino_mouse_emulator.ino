@@ -20,8 +20,6 @@
 #define JOYSTICK_HORIZONTAL_PIN     A7          /* Analog input pin for horizontal joystick value. */
 #define JOYSTICK_VERTICAL_PIN       A6          /* Analog input pin for vertical joystick value. */
 #define JOYSTICK_SWITCH_PIN         9           /* Joystick switch pin. */
-#define LEFT_CLICK_SWITCH_PIN       8           /* Left click switch pin. */
-#define RIGHT_CLICK_SWITCH_PIN      7           /* Right click switch pin. */
 #define LED_GREEN_PIN               6           /* Green LED pin. */
 #define LED_RED_PIN                 5           /* Red LED pin. */
 
@@ -52,8 +50,6 @@ String horizontalPixelStepsSign;                /* Stores the current horizontal
 String verticalPixelStepsSign;                  /* Stores the current vertical pixel steps value sign (+/-). */
 
 int joystickSwitchState;                        /* The state of the joystick switch. */
-int leftClickSwitchState;                       /* The state of the left click switch. */
-int rightClickSwitchState;                      /* The state of the right click switch. */
 
 char receivedSerial;
 uint16_t keepAliveCounter = 0;
@@ -73,8 +69,6 @@ void setup()
 
     /* Switches. */
     pinMode(JOYSTICK_SWITCH_PIN, INPUT_PULLUP);     /* Simulates scroll wheel. */
-    pinMode(LEFT_CLICK_SWITCH_PIN, INPUT_PULLUP);   /* Simulates left click. */
-    pinMode(RIGHT_CLICK_SWITCH_PIN, INPUT_PULLUP);  /* Simulates right click. */
 
     /* LEDs */
     pinMode(LED_GREEN_PIN, OUTPUT);                 /* The green LED. */
@@ -200,8 +194,6 @@ void read_joystick_sensors()
 void read_switches()
 {
     joystickSwitchState = (digitalRead(JOYSTICK_SWITCH_PIN) == 1) ? 0 : 1;
-    leftClickSwitchState = digitalRead(LEFT_CLICK_SWITCH_PIN);
-    rightClickSwitchState = digitalRead(RIGHT_CLICK_SWITCH_PIN);
 }
 
 
@@ -245,10 +237,6 @@ void transmit_data_package_frame()
                    verticalPixelStepsSign + ((String) verticalPixelSteps) +
                    ":" +
                    joystickSwitchState +
-                   ":" +
-                   leftClickSwitchState +
-                   ":" +
-                   rightClickSwitchState +
                    "E";
 
     /* Send package frame via serial interface. */
