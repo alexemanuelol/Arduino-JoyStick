@@ -8,11 +8,11 @@ import sys
 import threading
 import time
 
-class MouseEmulator:
-    """ Mouse emulator class. """
+class JoyStickHandler:
+    """ JoyStick Handler Class. """
 
     def __init__(self):
-        """ Initialize mouse emulator class. """
+        """ Initialize the JoyStick Handler Class. """
         # General variables
         self.connected = False
         self.baudrate = 9600
@@ -106,7 +106,7 @@ class MouseEmulator:
                 received += self.__sp.read(self.__sp.in_waiting).decode()
 
             if "HELLO" in received:
-                print(f"Arduino joystick found on port: {port}")
+                print(f"Arduino JoyStick found on port: {port}")
                 return True
             else:
                 self.clear_port()
@@ -241,5 +241,5 @@ class MouseEmulator:
 
 
 if __name__ == "__main__":
-    me = MouseEmulator()
-    me.start()
+    joystick = JoyStickHandler()
+    joystick.start()

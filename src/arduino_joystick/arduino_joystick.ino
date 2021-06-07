@@ -202,7 +202,7 @@ void read_switches()
  *********************************************************************************************************************/
 void convert_to_pixel_steps()
 {/*{{{*/
-    /* Get mouse step values. */
+    /* Get pixel step values. */
     horizontalPixelSteps = translate_value_to_pixel_steps(joystickHorizontalValue, joystickHorizontalNeutralPosValue);
     verticalPixelSteps = -(translate_value_to_pixel_steps(joystickVerticalValue, joystickVerticalNeutralPosValue));
 }/*}}}*/
